@@ -1,0 +1,742 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>蔡沛城的職場之路 | 互動履歷小遊戲</title>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #111; font-family: 'Segoe UI', sans-serif; }
+        canvas { display: block; margin: 0 auto; }
+        #ui-layer {
+            position: absolute; top: 20px; left: 20px; right: 20px;
+            pointer-events: none; display: flex; justify-content: space-between; z-index: 10;
+        }
+        .title-box { background: rgba(0,0,0,0.7); color: white; padding: 10px 20px; border-radius: 8px; border: 2px solid #fff; }
+        .title-box h2 { margin: 0 0 5px 0; font-size: 20px; }
+        .title-box p  { margin: 0; font-size: 14px; color: #ffd700; }
+        #skip-btn {
+            pointer-events: auto; padding: 12px 20px; background: #fff; color: #000;
+            text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 14px;
+            cursor: pointer; border: 2px solid #000; box-shadow: 2px 2px 0 #000; height: fit-content;
+        }
+        #skip-btn:hover { background: #e0e0e0; }
+        .overlay-panel {
+            position: absolute; inset: 0; display: none; align-items: center; justify-content: center;
+            background: rgba(0,0,0,0.75); color: #fff; z-index: 20; pointer-events: auto;
+            user-select: none; -webkit-user-select: none;
+        }
+        .overlay-content {
+            max-width: 720px; background: rgba(15,15,15,0.95); border-radius: 16px;
+            border: 2px solid #4CAF50; padding: 24px 28px; box-shadow: 0 0 25px rgba(0,0,0,0.8);
+        }
+        .overlay-content h1 { margin-top: 0; margin-bottom: 8px; font-size: 26px; }
+        .overlay-content p  { margin: 6px 0; line-height: 1.5; font-size: 16px; }
+        .overlay-hint { margin-top: 14px; font-size: 14px; color: #ffd700; }
+        #dialog-title { font-size: 20px; margin: 0 0 8px 0; }
+        #dialog-body  { font-size: 15px; line-height: 1.6; white-space: pre-line; }
+        #dialog-link  { margin-top: 8px; font-size: 14px; }
+        .overlay-content a { color: #4FC3F7; }
+        .dialog-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
+        .dialog-header h2 { margin: 0; font-size: 20px; flex: 1; }
+        .close-btn {
+            flex-shrink: 0; background: rgba(255,255,255,0.1); border: 1.5px solid rgba(255,255,255,0.35);
+            color: #fff; font-size: 18px; line-height: 1; width: 32px; height: 32px;
+            border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center;
+            transition: background 0.15s; outline: none;
+        }
+        .close-btn:hover  { background: rgba(255,255,255,0.22); }
+        .close-btn:active { background: rgba(255,255,255,0.35); }
+
+        /* 已收集經驗列表面板（長期顯示於左下方） */
+        #collect-panel {
+            position: absolute; bottom: 16px; left: 16px;
+            background: rgba(10,10,10,0.82); color: #fff;
+            border: 1.5px solid #4CAF50; border-radius: 10px;
+            padding: 8px 12px; font-size: 12px; z-index: 25;
+            pointer-events: auto; min-width: 180px;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+            display: none;
+        }
+        #collect-panel-title {
+            font-size: 11px; color: #4CAF50; letter-spacing: 1px;
+            margin-bottom: 5px; text-transform: uppercase;
+        }
+        .collect-item {
+            padding: 3px 0; cursor: pointer; border-radius: 4px;
+            transition: color 0.12s; line-height: 1.4;
+        }
+        .collect-item:hover { color: #ffd700; }
+        .collect-item .ci-num { color: #ffd700; margin-right: 4px; }
+
+        #transition-overlay {
+            position: absolute; inset: 0; background: #000; z-index: 35;
+            pointer-events: none; opacity: 0; transition: none;
+        }
+        #fall-overlay {
+            position: absolute; inset: 0; background: #000; z-index: 30;
+            pointer-events: none; opacity: 0; clip-path: circle(0% at 50% 50%);
+        }
+        #fall-overlay.fall-expand { animation: fallExpand 0.55s ease-in forwards; }
+        #fall-overlay.fall-full   { opacity: 1; clip-path: circle(150% at 50% 50%); }
+        #fall-overlay.fall-shrink { animation: fallShrink 0.45s ease-out forwards; }
+        @keyframes fallExpand { from{opacity:1;clip-path:circle(0% at 50% 50%)} to{opacity:1;clip-path:circle(150% at 50% 50%)} }
+        @keyframes fallShrink { from{opacity:1;clip-path:circle(150% at 50% 50%)} to{opacity:0;clip-path:circle(0% at 50% 50%)} }
+    </style>
+</head>
+<body>
+<div id="ui-layer">
+    <div class="title-box">
+        <h2>🎮 蔡沛城的職場之路</h2>
+        <p>方向鍵 / A、D 移動，空白鍵跳躍；收集經驗與技能！</p>
+    </div>
+    <!-- [修改4] 直接連結至 Google Drive PDF -->
+    <a id="skip-btn" href="https://drive.google.com/file/d/1ExPx9YO0VUT7JHPUXKH1yN8ylRtXNaAi/view?usp=sharing" target="_blank">📄 直接瀏覽 PDF 履歷</a>
+</div>
+
+<div id="intro-panel" class="overlay-panel">
+    <div class="overlay-content">
+        <h1>《蔡沛城的職場之路》</h1>
+        <p>謝謝您對我的履歷有興趣。</p>
+        <p>這是我用人工智慧生成、以我過去工作經驗為主題的小遊戲，</p>
+        <p>希望你遊玩完結後會對我有多一點認識。</p>
+        <p>如有需要，你也可按右上方的按鈕直接瀏覽及下載我的履歷。</p>
+        <p class="overlay-hint">玩法：鍵盤方向鍵左右（或 A 及 D 鍵）控制角色移動，空白鍵為跳躍。<br>沿路獲得技能及經驗，直至終點。</p>
+        <p class="overlay-hint">▶ 按任意鍵開始遊戲</p>
+    </div>
+</div>
+
+<div id="dialog-panel" class="overlay-panel">
+    <div class="overlay-content">
+        <div class="dialog-header">
+            <h2 id="dialog-title"></h2>
+            <button class="close-btn" id="dialog-close-btn" tabindex="-1" aria-label="關閉">✕</button>
+        </div>
+        <div id="dialog-body"></div>
+        <div id="dialog-link"></div>
+        <p id="dialog-hint" class="overlay-hint"></p>
+    </div>
+</div>
+
+<!-- 已收集經驗列表面板 -->
+<div id="collect-panel">
+    <div id="collect-panel-title">⭐ 已收集經驗</div>
+    <div id="collect-list"></div>
+</div>
+
+<div id="fall-overlay"></div>
+<div id="transition-overlay"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/kaboom@3000.1.17/dist/kaboom.js"></script>
+<script>
+window.onload = () => {
+
+    const URLS = {
+        player:   "https://i.ibb.co/GfP0HQYM/Gemini-Generated-Image-6hpicg6hpicg6hpi-removebg-preview.png",
+        bg_l1:    "https://res.cloudinary.com/dhrrd1vzh/image/upload/v1775070739/Gemini_Generated_Image_1sw11x1sw11x1sw1_d1jdsa.png",
+        bg_l1_w:  1160,
+        bg_l2:    "https://res.cloudinary.com/dhrrd1vzh/image/upload/v1775070739/Gemini_Generated_Image_vyxa0kvyxa0kvyxa_kgyrqd.png",
+        bg_l2_w:  1202,
+        floor_hk: "https://i.ibb.co/kVD3hSbD/Gemini-Generated-Image-hnyg9hhnyg9hhnyg.png",
+        floor_tp: "https://i.ibb.co/cSjwwy9z/Gemini-Generated-Image-3vqs5o3vqs5o3vqs.png",
+        manhole:  "PLACEHOLDER_manhole",
+        star:     "PLACEHOLDER_star",
+        signboard:"https://i.ibb.co/Fqqmvt2B/Whats-App-Image-2026-03-31-at-17-46-32-Photoroom.png",
+        gate:     "PLACEHOLDER_gate",
+    };
+
+    // [修改4] skip-btn 已在 HTML 直接設定 href，不需要在 JS 覆蓋
+    const introPanel     = document.getElementById("intro-panel");
+    const dialogPanel    = document.getElementById("dialog-panel");
+    const dialogTitle    = document.getElementById("dialog-title");
+    const dialogBody     = document.getElementById("dialog-body");
+    const dialogLink     = document.getElementById("dialog-link");
+    const dialogHint     = document.getElementById("dialog-hint");
+    const fallOverlay    = document.getElementById("fall-overlay");
+    const transOverlay   = document.getElementById("transition-overlay");
+    const dialogCloseBtn = document.getElementById("dialog-close-btn");
+    const collectPanel   = document.getElementById("collect-panel");
+    const collectList    = document.getElementById("collect-list");
+    const collectedItems = [];  // 儲存已收集的索引，跨關卡保留
+
+    function focusCanvas() {
+        const cv = document.querySelector("canvas");
+        if (cv) { if (!cv.hasAttribute("tabindex")) cv.setAttribute("tabindex","0"); cv.focus({preventScroll:true}); }
+    }
+    function showIntro() { introPanel.style.display = "flex"; }
+    function hideIntro() { introPanel.style.display = "none"; focusCanvas(); }
+
+    // ══════════════════════════════════════════════════════════════
+    // SVG SPRITES
+    // ══════════════════════════════════════════════════════════════
+    const svgManhole = `<svg xmlns="http://www.w3.org/2000/svg" width="120" height="80" viewBox="0 0 120 80">
+        <rect x="0" y="0" width="120" height="80" fill="#0d0d0d"/>
+        <rect x="0" y="0" width="120" height="30" fill="#1a1008" opacity="0.9"/>
+        <g><polygon points="2,2 38,2 32,22 2,22" fill="#3a3a3a" stroke="#222" stroke-width="1"/>
+        <line x1="10" y1="2" x2="8" y2="22" stroke="#555" stroke-width="1"/>
+        <line x1="20" y1="2" x2="18" y2="22" stroke="#555" stroke-width="1"/>
+        <line x1="30" y1="2" x2="28" y2="22" stroke="#555" stroke-width="1"/>
+        <line x1="4" y1="9" x2="34" y2="9" stroke="#555" stroke-width="1"/>
+        <line x1="3" y1="15" x2="33" y2="15" stroke="#555" stroke-width="1"/>
+        <line x1="2" y1="2" x2="38" y2="2" stroke="#666" stroke-width="1.5"/></g>
+        <g transform="translate(120,0) scale(-1,1)">
+        <polygon points="2,2 38,2 32,22 2,22" fill="#3a3a3a" stroke="#222" stroke-width="1"/>
+        <line x1="10" y1="2" x2="8" y2="22" stroke="#555" stroke-width="1"/>
+        <line x1="20" y1="2" x2="18" y2="22" stroke="#555" stroke-width="1"/>
+        <line x1="30" y1="2" x2="28" y2="22" stroke="#555" stroke-width="1"/>
+        <line x1="4" y1="9" x2="34" y2="9" stroke="#555" stroke-width="1"/>
+        <line x1="3" y1="15" x2="33" y2="15" stroke="#555" stroke-width="1"/>
+        <line x1="2" y1="2" x2="38" y2="2" stroke="#666" stroke-width="1.5"/></g>
+        <line x1="0" y1="0" x2="0" y2="80" stroke="#8B6030" stroke-width="3"/>
+        <line x1="120" y1="0" x2="120" y2="80" stroke="#8B6030" stroke-width="3"/>
+        <line x1="0" y1="1" x2="120" y2="1" stroke="#a07840" stroke-width="2"/>
+        <ellipse cx="60" cy="72" rx="25" ry="4" fill="#2a1a0a" opacity="0.5"/>
+    </svg>`;
+
+    const svgStar = `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+        <circle cx="32" cy="32" r="28" fill="#fff8c0" opacity="0.18"/>
+        <circle cx="32" cy="32" r="22" fill="#ffe566" opacity="0.22"/>
+        <polygon points="32,4 38,22 58,22 42,34 48,54 32,42 16,54 22,34 6,22 26,22"
+                 fill="#FFD700" stroke="#e6a800" stroke-width="2" stroke-linejoin="round"/>
+        <circle cx="32" cy="30" r="6" fill="#fff8c0" opacity="0.7"/>
+        <line x1="32" y1="0" x2="32" y2="8" stroke="#ffe08a" stroke-width="2" opacity="0.6"/>
+        <line x1="64" y1="32" x2="56" y2="32" stroke="#ffe08a" stroke-width="2" opacity="0.6"/>
+        <line x1="0" y1="32" x2="8" y2="32" stroke="#ffe08a" stroke-width="2" opacity="0.6"/>
+        <line x1="32" y1="64" x2="32" y2="56" stroke="#ffe08a" stroke-width="2" opacity="0.6"/>
+    </svg>`;
+
+    const svgSignboard = `<svg xmlns="http://www.w3.org/2000/svg" width="120" height="160" viewBox="0 0 120 160">
+        <rect x="30" y="70" width="8" height="90" fill="#555" rx="3"/>
+        <rect x="82" y="70" width="8" height="90" fill="#555" rx="3"/>
+        <rect x="5" y="8" width="110" height="64" fill="#1a6b2a" rx="5"/>
+        <rect x="5" y="8" width="110" height="64" fill="none" stroke="#c8d8a0" stroke-width="2.5" rx="5"/>
+        <text x="52" y="40" font-family="Arial,sans-serif" font-size="22" font-weight="bold"
+              fill="#ffffff" text-anchor="middle" letter-spacing="3">台灣</text>
+        <text x="52" y="58" font-family="Arial,sans-serif" font-size="10"
+              fill="#c8d8a0" text-anchor="middle" letter-spacing="2">TAIWAN</text>
+        <polygon points="90,28 110,40 90,52" fill="#ffffff"/>
+        <rect x="68" y="36" width="24" height="8" fill="#ffffff"/>
+        <rect x="25" y="152" width="20" height="8" fill="#444" rx="2"/>
+        <rect x="75" y="152" width="20" height="8" fill="#444" rx="2"/>
+    </svg>`;
+
+    const svgGate = `<svg xmlns="http://www.w3.org/2000/svg" width="256" height="360" viewBox="0 0 256 360">
+        <rect x="0" y="0" width="256" height="360" fill="#1a2535"/>
+        <rect x="0" y="12" width="256" height="2" fill="#243040" opacity="0.8"/>
+        <rect x="0" y="26" width="256" height="2" fill="#243040" opacity="0.8"/>
+        <rect x="64" y="0" width="2" height="160" fill="#243040" opacity="0.8"/>
+        <rect x="128" y="0" width="2" height="160" fill="#243040" opacity="0.8"/>
+        <rect x="192" y="0" width="2" height="160" fill="#243040" opacity="0.8"/>
+        <rect x="30" y="120" width="196" height="30" fill="#0f1a28" rx="2"/>
+        <text x="128" y="141" font-family="Arial" font-size="16" font-weight="bold"
+              fill="#4FC3F7" text-anchor="middle">創科中心</text>
+        <rect x="16" y="160" width="28" height="200" fill="#263545"/>
+        <rect x="212" y="160" width="28" height="200" fill="#263545"/>
+        <rect x="44" y="168" width="168" height="192" fill="#0f1a28"/>
+        <rect x="46" y="170" width="80" height="188" fill="#1a3a5c"/>
+        <rect x="130" y="170" width="80" height="188" fill="#1a3a5c"/>
+        <rect x="48" y="174" width="24" height="120" fill="#2a5a8a" opacity="0.5"/>
+        <rect x="132" y="174" width="24" height="120" fill="#2a5a8a" opacity="0.5"/>
+        <line x1="128" y1="168" x2="128" y2="360" stroke="#0a1520" stroke-width="3"/>
+        <rect x="110" y="270" width="12" height="5" fill="#4a6a8a" rx="1"/>
+        <rect x="134" y="270" width="12" height="5" fill="#4a6a8a" rx="1"/>
+        <rect x="46" y="170" width="80" height="188" fill="#ffe8a0" opacity="0.06"/>
+        <rect x="130" y="170" width="80" height="188" fill="#ffe8a0" opacity="0.06"/>
+    </svg>`;
+
+    const svgFloorHK = `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="80" viewBox="0 0 64 80">
+        <rect x="0" y="0" width="64" height="80" fill="#2a2d37"/>
+        <line x1="0" y1="0" x2="64" y2="0" stroke="#232630" stroke-width="2"/>
+        <line x1="0" y1="28" x2="64" y2="28" stroke="#232630" stroke-width="1.5"/>
+        <line x1="0" y1="56" x2="64" y2="56" stroke="#232630" stroke-width="1.5"/>
+        <line x1="0" y1="0" x2="0" y2="80" stroke="#232630" stroke-width="1.5"/>
+        <line x1="64" y1="0" x2="64" y2="80" stroke="#232630" stroke-width="1.5"/>
+        <rect x="1" y="1" width="61" height="25" fill="#2e3140" opacity="0.4"/>
+    </svg>`;
+
+    const svgFloorTP = `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="80" viewBox="0 0 64 80">
+        <rect x="0" y="0" width="64" height="80" fill="#b4a58c"/>
+        <line x1="0" y1="0" x2="64" y2="0" stroke="#9a8c76" stroke-width="2"/>
+        <line x1="0" y1="28" x2="64" y2="28" stroke="#9a8c76" stroke-width="1.5"/>
+        <line x1="0" y1="56" x2="64" y2="56" stroke="#9a8c76" stroke-width="1.5"/>
+        <line x1="0" y1="0" x2="0" y2="80" stroke="#9a8c76" stroke-width="1.5"/>
+        <line x1="64" y1="0" x2="64" y2="80" stroke="#9a8c76" stroke-width="1.5"/>
+        <rect x="1" y="1" width="61" height="25" fill="#c4b8a0" opacity="0.4"/>
+    </svg>`;
+
+    function loadSvgSprite(name, svg) {
+        loadSprite(name, "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg));
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    // 對話資料
+    // ══════════════════════════════════════════════════════════════
+    const dialogData = [
+        { title: "經驗 1：進入媒體業",
+          body: "2014 年加入香港男士平台 MenClub.hk，初期為活動助理，\n後因文案寫作出色而轉任編輯。\n負責影視、科技、遊戲、生活類內容製作。" },
+        { title: "經驗 2：MenClub Girl 專訪系列",
+          body: "2015 年起負責平台主打欄目《MenClub Girl》專訪系列，\n全程負責規劃、協調、製作及社群分發等策略，\n至 2023 年完成超過 100 期內容製作。",
+          linkText: "👉 點此查看作品簡報",
+          linkUrl: "https://docs.google.com/presentation/d/1hPRfgYT5ZUvkSiCgKrQQBh9Qtc6CtbIXcmJmd5d162Y/edit?usp=sharing" },
+        { title: "經驗 3：Taboola News 經驗",
+          body: "2020 年起兼任 Taboola 旗下 Taboola News 編輯，\n管理香港及台灣市場內容品質與推送，\n在跨國合作環境下長期洞察兩地媒體趨勢與熱門話題。" },
+        { title: "經驗 4：赴台進修新媒體碩士",
+          body: "2023 年赴台進修，入讀銘傳大學傳播學院\n新媒體暨傳播管理學系碩士課程，\n補完大眾傳播與行銷的理論知識。" },
+        { title: "經驗 5：節目企劃與製作",
+          body: "於台灣參與香港 ViuTV 節目《404_886 流量密碼》製作，\n擔任資料及撰稿，負責嘉賓發想與邀約、事前訪問、腳本撰寫，\n並參與拍攝現場調度與後期剪接協作。",
+          linkText: "👉 點此查看節目企劃簡報",
+          linkUrl: "https://docs.google.com/presentation/d/1yGHwLhbuJI1wis-e4wvBDMj0kiMcL3ZeH2Wf2vBgPDc/edit?usp=sharing" },
+        { title: "經驗 6：學業與生涯轉折",
+          body: "2025 年末以系內第一名完成碩士課程，\n期間多次獲選為中華民國僑務委員會僑生獎助學金得主。\n希望於台灣繼續生活，決定在台灣職場重新開始。" },
+        { title: "經驗 7：數據與 AI 技能",
+          body: "空餘時間完成 Google Analytics、Google Project Management\n及 Meta Social Media Marketing 證書，銜接職場實際技能。\n同時鑽研利用 AI 與 LLM 協助工作，提升生產力。" }
+    ];
+
+    // [修改3] 終點對話框：移除 ✕ 按鈕與重玩功能
+    const endDialog = {
+        title: "抵達終點：新的職涯篇章",
+        body:  "謝謝您的遊玩。\n希望有機會可以與您會面。\n若有任何需要，歡迎隨時聯絡我。\n電話：09 11635180\n電郵：puishingchoi.425@gmail.com",
+    };
+
+    let gamePausedForDialog = false;
+    let isEndDialog = false;
+
+    // 收集列表：跨關卡長期顯示，記錄所有已收集的經驗
+    function addToCollectPanel(index) {
+        const data = dialogData[index];
+        if (!data || collectedItems.includes(index)) return;
+        collectedItems.push(index);
+
+        // 建立列表項目
+        const div = document.createElement("div");
+        div.className = "collect-item";
+        div.dataset.index = index;
+        // 顯示簡短名稱（去掉「經驗 N：」前綴取後半）
+        const shortTitle = data.title.replace(/^經驗 \d+：/, "");
+        div.innerHTML = `<span class="ci-num">經${index + 1}</span>${shortTitle}`;
+        div.onclick = () => showDialogForItem(index);
+        collectList.appendChild(div);
+        collectPanel.style.display = "block";
+    }
+
+    function showDialogForItem(index) {
+        const data = dialogData[index];
+        if (!data) return;
+        dialogTitle.textContent = data.title;
+        dialogBody.textContent  = data.body;
+        dialogLink.innerHTML    = "";
+        if (data.linkText && data.linkUrl) {
+            const a = document.createElement("a");
+            a.href = data.linkUrl; a.target = "_blank"; a.rel = "noopener noreferrer";
+            a.textContent = data.linkText;
+            dialogLink.appendChild(a);
+        }
+        dialogCloseBtn.style.display = "flex";
+        dialogCloseBtn.onclick = () => hideDialog();
+        dialogHint.textContent = "點右上 ✕ 繼續遊戲";
+        dialogPanel.style.display = "flex";
+        gamePausedForDialog = true; isEndDialog = false;
+    }
+
+    function showEndDialog() {
+        if (gamePausedForDialog) return;
+        dialogTitle.textContent = endDialog.title;
+        dialogBody.textContent  = endDialog.body;
+        dialogLink.innerHTML    = "";
+        // [修改3] 終點對話框：隱藏 ✕ 按鈕，無提示文字，不可關閉
+        dialogCloseBtn.style.display = "none";
+        dialogHint.textContent = "";
+        dialogPanel.style.display = "flex";
+        gamePausedForDialog = true; isEndDialog = true;
+    }
+
+    function hideDialog() {
+        dialogPanel.style.display = "none";
+        gamePausedForDialog = false; isEndDialog = false;
+        focusCanvas();
+    }
+
+    let introClosed = false;
+    function closeIntroIfNeeded() {
+        if (!introClosed && introPanel.style.display === "flex") { introClosed = true; hideIntro(); }
+    }
+    document.addEventListener("keydown",    closeIntroIfNeeded);
+    document.addEventListener("mousedown",  closeIntroIfNeeded);
+    document.addEventListener("touchstart", closeIntroIfNeeded);
+
+    // ── 掉坑黑幕 ─────────────────────────────────────────────────
+    function playFallIn(cb) {
+        fallOverlay.className = ""; fallOverlay.style.opacity = "";
+        void fallOverlay.offsetWidth;
+        fallOverlay.classList.add("fall-expand");
+        fallOverlay.addEventListener("animationend", function h() {
+            fallOverlay.removeEventListener("animationend", h);
+            fallOverlay.classList.remove("fall-expand");
+            fallOverlay.classList.add("fall-full");
+            if (cb) cb();
+        }, { once: true });
+    }
+    function playFallOut() {
+        fallOverlay.classList.remove("fall-full");
+        void fallOverlay.offsetWidth;
+        fallOverlay.classList.add("fall-shrink");
+        fallOverlay.addEventListener("animationend", function h() {
+            fallOverlay.removeEventListener("animationend", h);
+            fallOverlay.classList.remove("fall-shrink");
+            fallOverlay.style.opacity = "0";
+        }, { once: true });
+    }
+
+    // ── 關卡切換 ─────────────────────────────────────────────────
+    let levelTransitioning = false;
+    function switchToLevel(targetScene) {
+        if (levelTransitioning) return;
+        levelTransitioning = true;
+        gamePausedForDialog = true;
+        transOverlay.style.transition = "opacity 0.5s ease-in";
+        transOverlay.style.opacity = "1";
+        setTimeout(() => {
+            go(targetScene);
+            gamePausedForDialog = false;
+            setTimeout(() => {
+                transOverlay.style.transition = "opacity 0.6s ease-out";
+                transOverlay.style.opacity = "0";
+                setTimeout(() => {
+                    levelTransitioning = false;
+                    transOverlay.style.transition = "none";
+                }, 700);
+            }, 100);
+        }, 550);
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    // KABOOM 初始化
+    // ══════════════════════════════════════════════════════════════
+    kaboom({ width: 1024, height: 600, letterbox: true, background: [0, 0, 0] });
+
+    loadSprite("player", URLS.player);
+
+    function loadAny(key, url, svgFallback) {
+        if (url && !url.startsWith("PLACEHOLDER")) loadSprite(key, url);
+        else loadSvgSprite(key, svgFallback);
+    }
+    loadAny("floor_hk",  URLS.floor_hk,  svgFloorHK);
+    loadAny("floor_tp",  URLS.floor_tp,  svgFloorTP);
+    loadAny("manhole",   URLS.manhole,   svgManhole);
+    loadAny("star",      URLS.star,      svgStar);
+    loadAny("signboard", URLS.signboard, svgSignboard);
+    loadAny("gate",      URLS.gate,      svgGate);
+
+    // 背景圖
+    const bgStatus = { l1: "fallback", l2: "fallback" };
+    if (URLS.bg_l1 && !URLS.bg_l1.startsWith("PLACEHOLDER")) { loadSprite("bg_l1", URLS.bg_l1); bgStatus.l1 = "ok"; }
+    if (URLS.bg_l2 && !URLS.bg_l2.startsWith("PLACEHOLDER")) { loadSprite("bg_l2", URLS.bg_l2); bgStatus.l2 = "ok"; }
+
+    // ══════════════════════════════════════════════════════════════
+    // 共用常數
+    // ══════════════════════════════════════════════════════════════
+    const FLOOR_Y    = 520;
+    const HOLE_W     = 120;
+    const HOLE_HALF  = 60;
+    const MOVE_SPEED = 260;
+    const JUMP_FORCE = 820;
+    const SPRITE_W   = 200, SPRITE_H = 120;
+    const HIT_OX     = 72,  HIT_OY   = 38, HIT_W = 56, HIT_H = 82;
+    const SIGN_W = 120, SIGN_H = 160;
+
+    let player;
+    let facing    = "right";
+    let isFalling = false;
+
+    function addBgRect(x, y, w, h, col, zVal) {
+        add([ rect(w, h), pos(x, y), color(...col), z(zVal), opacity(1) ]);
+    }
+
+    function buildHKBg(levelW) {
+        [[0,60,[8,12,35]],[60,120,[12,18,50]],[120,200,[18,25,65]],[200,300,[22,32,75]],[300,420,[28,40,85]],[420,520,[35,50,90]]]
+            .forEach(([y1,y2,c]) => addBgRect(0, y1, levelW, y2-y1, c, -90));
+        addBgRect(0, 420, levelW, 100, [15,30,70], -89);
+        [[0,40,280],[35,30,320],[60,50,260],[100,35,350],[130,45,290],[168,30,240],[190,55,300],[238,25,260],
+         [258,40,310],[295,35,280],[325,50,260],[368,30,220],[392,45,290],[430,35,310],[460,50,270]]
+            .forEach(([rx,w,h]) => addBgRect(rx, 420-h, w, h, [15,25,55], -85));
+        for (let wx=10; wx<levelW; wx+=12)
+            for (let wy=100; wy<400; wy+=18)
+                if (Math.random()>0.5) addBgRect(wx, wy, 5, 7, Math.random()>.5?[255,220,120]:[180,200,255], -83);
+        // 地板帶
+        addBgRect(0, FLOOR_Y, levelW, 80, [42,46,54], -70);
+    }
+
+    function buildTPBg(levelW) {
+        [[0,80,[100,160,230]],[80,180,[130,185,240]],[180,300,[160,210,248]],[300,420,[190,225,250]],[420,520,[220,240,252]]]
+            .forEach(([y1,y2,c]) => addBgRect(0, y1, levelW, y2-y1, c, -90));
+        [[100,50],[400,35],[800,60],[1200,45],[1600,55],[2000,40],[2400,65],[2800,50]]
+            .forEach(([cx,cy]) => { addBgRect(cx,cy+10,80,20,[255,255,255],-88); addBgRect(cx+10,cy,60,18,[255,255,255],-88); });
+        addBgRect(0, 260, levelW, 18, [160,165,175], -84);
+        for (let px=80; px<levelW; px+=200) addBgRect(px, 278, 20, 140, [145,150,160], -84);
+        for (let sx=0; sx<levelW-80; sx+=80) {
+            addBgRect(sx, 340, 78, 80, [140,60,40], -83);
+            addBgRect(sx+10, 360, 56, 60, [40,20,15], -82);
+        }
+        // 地板帶
+        addBgRect(0, FLOOR_Y, levelW, 80, [163,147,118], -70);
+    }
+
+    // ── [修改1] 背景視差 ──────────────────────────────────────────
+    // 背景圖高度 = 600px（與畫面等高），pos.y 向上移動使底部與地板頂端貼合
+    // 背景圖底端（y=600）對齊遊戲地板頂端（y=520）
+    // 所以 bgObj.pos.y = -(600 - FLOOR_Y) = -80，即向上移80px，上方溢出沒關係
+    function buildBgParallax(spriteKey, bgImgW, levelW) {
+        let screenOffsetX = 0;
+        const BG_OFFSET_Y = -(600 - FLOOR_Y);  // = -80，底端貼齊地板頂端
+
+        onUpdate(() => {
+            const camX     = camPos().x;
+            const camRange = Math.max(1, levelW - 1024);
+            const bgRange  = Math.max(0, bgImgW - 1024);
+            const t        = clamp((camX - 512) / camRange, 0, 1);
+            screenOffsetX  = -t * bgRange;
+        });
+
+        const bgObj = add([
+            sprite(spriteKey),
+            pos(0, BG_OFFSET_Y),
+            fixed(),
+            z(-9999),
+            opacity(1),
+        ]);
+
+        onUpdate(() => {
+            bgObj.pos.x = screenOffsetX;
+            bgObj.pos.y = BG_OFFSET_Y;
+        });
+    }
+
+    // ── 地板 + 坑 ─────────────────────────────────────────────────
+    function buildFloorAndHoles(levelW, holes, floorKey) {
+        const bounds = holes.map(cx => ({ l: cx - HOLE_HALF, r: cx + HOLE_HALF }));
+        let prev = 0;
+        bounds.forEach(b => {
+            const w = b.l - prev;
+            if (w > 0) add([ rect(w, 80), pos(prev, FLOOR_Y), area(), body({isStatic:true}), opacity(0) ]);
+            prev = b.r;
+        });
+        const tailW = levelW - prev;
+        if (tailW > 0) add([ rect(tailW, 80), pos(prev, FLOOR_Y), area(), body({isStatic:true}), opacity(0) ]);
+
+        for (let tx=0; tx<levelW; tx+=64) {
+            const overlapsHole = holes.some(cx => tx+64 > cx-HOLE_HALF && tx < cx+HOLE_HALF);
+            if (!overlapsHole) add([ sprite(floorKey), pos(tx, FLOOR_Y), z(-60) ]);
+        }
+        holes.forEach(cx => {
+            add([ sprite("manhole"), pos(cx - HOLE_HALF, FLOOR_Y), z(-55) ]);
+        });
+    }
+
+    // ── 道具 ─────────────────────────────────────────────────────
+    function buildItems(itemCfgs) {
+        itemCfgs.forEach(({ x, index }) => {
+            const star = add([
+                sprite("star"), pos(x - 32, FLOOR_Y - 72),
+                area({ shape: new Rect(vec2(12,12), 40, 40) }),
+                rotate(0), anchor("topleft"), "item", { index }
+            ]);
+            star.onUpdate(() => { star.angle += 60 * dt(); });
+        });
+    }
+
+    // ── 玩家 ─────────────────────────────────────────────────────
+    function buildPlayer(startX) {
+        player = add([
+            sprite("player", { width: SPRITE_W, height: SPRITE_H }),
+            pos(startX, FLOOR_Y - SPRITE_H),
+            area({ shape: new Rect(vec2(HIT_OX, HIT_OY), HIT_W, HIT_H) }),
+            body(), z(10), "player"
+        ]);
+    }
+
+    // ── 控制 ─────────────────────────────────────────────────────
+    function setupControls(levelW, holeConfigs) {
+        const camMinX = width() / 2;
+        const camMaxX = levelW - width() / 2;
+        camPos(clamp(player.pos.x, camMinX, camMaxX), height() / 2);
+
+        onUpdate(() => {
+            if (!gamePausedForDialog && !isFalling) {
+                let dir = 0;
+                if (isKeyDown("left")  || isKeyDown("a")) dir -= 1;
+                if (isKeyDown("right") || isKeyDown("d")) dir += 1;
+                player.move(dir * MOVE_SPEED, 0);
+                if (player.pos.x < 0) player.pos.x = 0;
+                if (dir < 0 && facing !== "left") {
+                    facing = "left";
+                    player.use(sprite("player", { width: SPRITE_W, height: SPRITE_H, flipX: true }));
+                } else if (dir > 0 && facing !== "right") {
+                    facing = "right";
+                    player.use(sprite("player", { width: SPRITE_W, height: SPRITE_H }));
+                }
+                const footY = player.pos.y + HIT_OY + HIT_H;
+                if (footY >= FLOOR_Y - 8 && footY <= FLOOR_Y + 24) {
+                    const fL = player.pos.x + HIT_OX, fR = player.pos.x + HIT_OX + HIT_W;
+                    for (const cx of holeConfigs) {
+                        if (fL >= cx - HOLE_HALF && fR <= cx + HOLE_HALF) {
+                            triggerFall(cx, holeConfigs, camMinX, camMaxX); break;
+                        }
+                    }
+                }
+            }
+            camPos(clamp(player.pos.x, camMinX, camMaxX), height() / 2);
+        });
+
+        function tryJump() {
+            if (!gamePausedForDialog && !isFalling && player.isGrounded()) player.jump(JUMP_FORCE);
+        }
+        onKeyPress("space", tryJump);
+        onKeyPress(["up","w"], tryJump);
+        return { camMinX, camMaxX };
+    }
+
+    function triggerFall(holeCX, holeConfigs, camMinX, camMaxX) {
+        if (isFalling) return;
+        isFalling = true;
+        let rX = holeCX - 300;
+        let passes = 0, moved = true;
+        while (moved && passes < 10) {
+            moved = false;
+            for (const cx of holeConfigs) {
+                if (Math.abs(rX - cx) < HOLE_HALF + 60) { rX = cx - HOLE_HALF - 110; moved = true; }
+            }
+            passes++;
+        }
+        rX = Math.max(rX, 80);
+        let elapsed = 0;
+        const CI = 0.05;
+        function waitFall() {
+            elapsed += CI;
+            if (player.pos.y > height() + 60 || elapsed > 1.5) {
+                playFallIn(() => {
+                    player.pos = vec2(rX, FLOOR_Y - SPRITE_H);
+                    player.vel = vec2(0, 0);
+                    camPos(clamp(rX, camMinX, camMaxX), height() / 2);
+                    wait(0.2, () => { playFallOut(); wait(0.55, () => { isFalling = false; }); });
+                });
+            } else { wait(CI, waitFall); }
+        }
+        wait(CI, waitFall);
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    // 關卡1
+    // ══════════════════════════════════════════════════════════════
+    const L1 = {
+        W: 3200,
+        holes: [720, 1500, 2300],
+        items: [
+            { x: 1110, index: 0 },
+            { x: 1900, index: 1 },
+            { x: 2600, index: 2 },
+        ],
+        signCX: 2950,
+        exitX:  3150,
+    };
+
+    scene("level1", () => {
+        setGravity(1800);
+        isFalling = false;
+        facing = "right";
+
+        if (bgStatus.l1 === "ok") {
+            buildBgParallax("bg_l1", URLS.bg_l1_w, L1.W);
+        } else {
+            buildHKBg(L1.W);
+        }
+
+        buildFloorAndHoles(L1.W, L1.holes, "floor_hk");
+        buildItems(L1.items);
+
+        add([
+            sprite("signboard", { width: SIGN_W, height: SIGN_H }),
+            pos(L1.signCX - SIGN_W / 2, FLOOR_Y - SIGN_H),
+            z(5)
+        ]);
+
+        buildPlayer(200);
+        const { camMinX, camMaxX } = setupControls(L1.W, L1.holes);
+
+        player.onCollide("item", (item) => {
+            const idx = item.index;
+            destroy(item);
+            addToCollectPanel(idx);  // 加入收集列表（長期顯示）
+            showDialogForItem(idx);  // 彈出對話框
+        });
+
+        let level1Exited = false;
+        onUpdate(() => {
+            if (!level1Exited && !gamePausedForDialog && !isFalling) {
+                if (player.pos.x > L1.exitX) {
+                    level1Exited = true;
+                    switchToLevel("level2");
+                }
+            }
+        });
+    });
+
+    // ══════════════════════════════════════════════════════════════
+    // 關卡2
+    // ══════════════════════════════════════════════════════════════
+    const L2 = {
+        W: 4200,
+        holes: [700, 1480, 2260, 3040],
+        items: [
+            { x: 1090, index: 3 },
+            { x: 1870, index: 4 },
+            { x: 2650, index: 5 },
+            { x: 3400, index: 6 },
+        ],
+        gateX: 3700,
+    };
+
+    scene("level2", () => {
+        setGravity(1800);
+        isFalling = false;
+        facing = "right";
+
+        if (bgStatus.l2 === "ok") {
+            buildBgParallax("bg_l2", URLS.bg_l2_w, L2.W);
+        } else {
+            buildTPBg(L2.W);
+        }
+
+        buildFloorAndHoles(L2.W, L2.holes, "floor_tp");
+        buildItems(L2.items);
+
+        add([
+            sprite("gate", { width: 256, height: 360 }),
+            pos(L2.gateX - 128, FLOOR_Y - 360),
+            area({ shape: new Rect(vec2(44, 168), 168, 192) }),
+            z(5), "portal"
+        ]);
+
+        buildPlayer(200);
+        const { camMinX, camMaxX } = setupControls(L2.W, L2.holes);
+
+        player.onCollide("item", (item) => {
+            const idx = item.index;
+            destroy(item);
+            addToCollectPanel(idx);  // 加入收集列表（長期顯示）
+            showDialogForItem(idx);  // 彈出對話框
+        });
+
+        player.onCollide("portal", () => { showEndDialog(); });
+    });
+
+    // ══════════════════════════════════════════════════════════════
+    // 啟動
+    // ══════════════════════════════════════════════════════════════
+    onLoad(() => {
+        go("level1");
+        showIntro();
+        setTimeout(focusCanvas, 200);
+    });
+};
+</script>
+</body>
+</html>
